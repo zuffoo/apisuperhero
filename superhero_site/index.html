@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Superhero CRUD</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container my-5">
+        <h1 class="text-center">Superheroes CRUD</h1>
+
+        <div class="input-group my-4">
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar herói por nome">
+            <button id="searchButton" class="btn btn-primary">Pesquisar</button>
+        </div>
+
+        <div class="d-flex justify-content-center gap-3 mb-4">
+            <button id="fetchHeroes" class="btn btn-success">Buscar Todos os Heróis</button>
+            <button id="deleteAll" class="btn btn-danger">Excluir Todos os Heróis</button>
+        </div>
+
+        <h2 class="text-center">Lista de Heróis</h2>
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Imagem</th>
+                        <th>ID</th>
+                        <th>Nome</th>
+                        <th>Alinhamento</th>
+                        <th>Inteligência</th>
+                        <th>Força</th>
+                        <th>Velocidade</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="heroTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <h2 class="text-center mt-5">Logs de Operações</h2>
+        <div class="d-flex justify-content-center gap-3 mb-3">
+            <button id="deleteAllLogs" class="btn btn-danger">Excluir Todos os Logs</button>
+        </div>
+        <ul id="logList" class="list-group">
+        </ul>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const baseUrl = 'api_proxy.php';  
+
+        
+        document.getElementById('fetchHeroes').addEventListener('click', () => {
+            fetch(baseUrl + '?action=fetch_all')
+                .then(response => response.json())
+                .then(data => {
+                    const heroes = data.results;
+                    saveHeroes(heroes);
+                    displayHeroes(heroes);
+                    logFetch(heroes.length);
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar heróis:', error);
+                    alert('Erro ao buscar heróis.');
+                });
+        });
+
+        
+        document.getElementById('searchButton').addEventListener('click', () => {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                alert('Digite o nome de um herói para buscar.');
+                return;
+            }
+
+            fetch(baseUrl + '?action=search_hero&name=' + query)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.response === 'error') {
+                        alert('Herói não encontrado.');
+                        return;
+                    }
+
+                    
+                    saveHeroes(data.results);
+                    displayHeroes(data.results);
+                    logFetch(data.results.length);
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar herói:', error);
+                    alert('Erro ao buscar herói.');
+                });
+        });
+
+        
+        document.getElementById('deleteAll').addEventListener('click', () => {
+            fetch('api_handler.php?delete_all=true', { method: 'DELETE' })
+                .then(() => {
+                    alert('Todos os registros foram excluídos!');
+                    document.getElementById('heroTableBody').innerHTML = '';
+                })
+                .catch(error => {
+                    console.error('Erro ao excluir registros:', error);
+                    alert('Erro ao excluir registros.');
+                });
+        });
+
+        
+        document.getElementById('deleteAllLogs').addEventListener('click', () => {
+            fetch('api_handler.php?delete_all_logs=true', { method: 'DELETE' })
+                .then(() => {
+                    alert('Todos os logs foram excluídos!');
+                    loadLogs();  
+                })
+                .catch(error => {
+                    console.error('Erro ao excluir logs:', error);
+                    alert('Erro ao excluir logs.');
+                });
+        });
+
+        
+        function saveHeroes(heroes) {
+            heroes.forEach(hero => {
+                fetch('api_handler.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        hero_id: hero.id,
+                        name: hero.name,
+                        alignment: hero.biography.alignment,
+                        intelligence: hero.powerstats.intelligence,
+                        strength: hero.powerstats.strength,
+                        speed: hero.powerstats.speed,
+                        image: hero.image.url
+                    }),
+                });
+            });
+        }
+
+        
+        function displayHeroes(heroes) {
+            const tbody = document.getElementById('heroTableBody');
+            tbody.innerHTML = '';
+
+            heroes.forEach(hero => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><img src="${hero.image.url}" alt="${hero.name}" style="width: 50px; height: 50px;"></td>
+                    <td>${hero.id}</td>
+                    <td>${hero.name}</td>
+                    <td>${hero.biography.alignment || 'Desconhecido'}</td>
+                    <td>${hero.powerstats.intelligence || 'N/A'}</td>
+                    <td>${hero.powerstats.strength || 'N/A'}</td>
+                    <td>${hero.powerstats.speed || 'N/A'}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" onclick="deleteHero(${hero.id})">Excluir</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        
+        function logFetch(count) {
+            fetch('api_handler.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    log: true,
+                    numeroregistros: count,
+                }),
+            }).then(() => loadLogs());
+        }
+
+        
+        function loadLogs() {
+            fetch('api_handler.php?logs=true')
+                .then(response => response.json())
+                .then(data => {
+                    const list = document.getElementById('logList');
+                    list.innerHTML = '';
+                    data.forEach(log => {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        li.innerHTML = `
+                            Data: ${log.datahora}, Registros: ${log.numeroregistros}
+                            <button class="btn btn-danger btn-sm float-end" onclick="deleteLog(${log.id})">Excluir</button>
+                        `;
+                        list.appendChild(li);
+                    });
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar logs:', error);
+                    alert('Erro ao carregar logs.');
+                });
+        }
+
+        
+        function deleteHero(id) {
+            fetch(`api_handler.php?delete_hero=${id}`, { method: 'DELETE' })
+                .then(response => {
+                    if (response.ok) {
+                        alert(`Herói com ID ${id} excluído!`);
+                        loadHeroes(); 
+                    } else {
+                        alert('Erro ao excluir o herói.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao excluir herói:', error);
+                    alert('Erro ao excluir herói.');
+                });
+        }
+
+        function deleteLog(logId) {
+            fetch(`api_handler.php?delete_log=${logId}`, { method: 'DELETE' })
+                .then(() => {
+                    alert(`Log com ID ${logId} excluído!`);
+                    loadLogs();  
+                })
+                .catch(error => {
+                    console.error('Erro ao excluir log:', error);
+                    alert('Erro ao excluir log.');
+                });
+        }
+
+        
+        loadLogs();
+    </script>
+
+</body>
+</html>
